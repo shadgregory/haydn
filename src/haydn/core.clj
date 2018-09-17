@@ -106,7 +106,9 @@
                           (inc (.getLastRowNum obj))))
         td-list (rest form)]
     (dotimes [n (count td-list)]
-      (parse-expr (nth td-list n) row))))
+      (parse-expr (nth td-list n) row))
+    (dotimes [i (.getPhysicalNumberOfCells (.getRow obj 0))]
+      (.autoSizeColumn obj i))))
 
 (defmethod parse-expr :td
   [form obj]
