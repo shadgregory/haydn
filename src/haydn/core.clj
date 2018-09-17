@@ -1,6 +1,7 @@
 (ns haydn.core
   (:import [java.io File FileOutputStream]
            [java.awt Color]
+           [org.apache.poi.common.usermodel HyperlinkType]
            (org.apache.poi.ss.usermodel CellStyle
                                         CellType
                                         CreationHelper
@@ -27,6 +28,7 @@
                          (= :td (first form)) :td
                          (= :tbody (first form)) :tbody
                          (= :thead (first form)) :thead
+                         (= :a (first form)) :a
                          (= 'for (first form)) :for
                          (map? form) :map
                          (seq? form) :seq)))
@@ -40,6 +42,16 @@
 (defmethod parse-expr :tbody
   [form obj]
   (parse-expr (rest form) obj))
+
+(defmethod parse-expr :a
+  [form obj]
+  (let [url (:href (second form))
+        text (nth form 2)
+        create-helper (.getCreationHelper workbook)
+        link (.createHyperlink create-helper HyperlinkType/URL)]
+    (.setCellValue obj text)
+    (.setAddress link url)
+    (.setHyperlink obj link)))
 
 (defmethod parse-expr :thead
   [form obj]
@@ -56,18 +68,19 @@
 ;;CellStyle style = wb.createCellStyle();
 (defmethod parse-expr :map
   [form obj]
-  (if (and (= "org.apache.poi.xssf.usermodel.XSSFRow"
-              (.getName (type obj)))
-           (contains? form :background-color))
-    (let [style (.createCellStyle workbook)
-          background-color (:background-color form)]
-      (try
-        (.setFillBackgroundColor style (.getIndex (IndexedColors/valueOf (.toUpperCase background-color))))
-        (catch IllegalArgumentException e
-          ;;not an indexed color, let's assume it's hex
-          (.setFillForegroundColor style (new XSSFColor (Color/decode background-color)))))
-      (.setFillPattern style FillPatternType/SOLID_FOREGROUND)
-      (.setRowStyle obj style))))
+  (if (= "org.apache.poi.xssf.usermodel.XSSFRow"
+         (.getName (type obj)))
+    (cond
+      (contains? form :background-color)
+      (let [style (.createCellStyle workbook)
+            background-color (:background-color form)]
+        (try
+          (.setFillBackgroundColor style (.getIndex (IndexedColors/valueOf (.toUpperCase background-color))))
+          (catch IllegalArgumentException e
+            ;;not an indexed color, let's assume it's hex
+            (.setFillForegroundColor style (new XSSFColor (Color/decode background-color)))))
+        (.setFillPattern style FillPatternType/SOLID_FOREGROUND)
+        (.setRowStyle obj style)))))
 
 (defmethod parse-expr :seq
   [form obj]
@@ -102,6 +115,7 @@
                             0
                             (Integer. (str (.getLastCellNum obj)))))]
     (cond
+      (vector? (first (rest form))) (parse-expr (first (rest form)) cell)
       (integer? (first (rest form))) (.setCellValue
                                       cell
                                       (Double. (str (first (rest form)))))
@@ -129,23 +143,24 @@
             [:tr [:td "Abraham Lincoln"]
              [:td "1809"]
              [:td "1865"]
-             [:td ""]]
+             [:td
+              [:a {:href "https://en.wikipedia.org/wiki/Abraham_Lincoln"} "Bio"]]]
             [:tr
              [:td "Andrew Johnson"]
              [:td "1808"]
              [:td "1875"]
-             [:td ""]]
+             [:td [:a {:href "https://en.wikipedia.org/wiki/Andrew_Johnson"} "Bio"]]]
             [:tr
              [:td "Ulysses S. Grant"]
              [:td "1822"]
              [:td "1885"]
              [:td
-              ""]]
+              [:a {:href "https://en.wikipedia.org/wiki/Ulysses_S._Grant"} "Bio"]]]
             [:tr
              [:td "Rutherford B. Hayes"]
              [:td "1822"]
              [:td "1893"]
-             [:td ""]]]]
+             [:td [:a {:href "https://en.wikipedia.org/wiki/Rutherford_B._Hayes"} "Bio"]]]]]
           [:table {:title "First Sheet"}
            [:tr [:td "A"] [:td "B"] [:td "C"] [:td "D"]]
            [:tr [:td "E"] [:td "F"] [:td "G"] [:td "H"]]
