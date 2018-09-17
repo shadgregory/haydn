@@ -1,6 +1,23 @@
 (ns haydn.core
   (:import [java.io File FileOutputStream]
+           [java.awt Color]
+           (org.apache.poi.ss.usermodel CellStyle
+                                        CellType
+                                        CreationHelper
+                                        FillPatternType
+                                        HorizontalAlignment
+                                        IndexedColors)
+           (org.apache.poi.xssf.usermodel XSSFWorkbook
+                                          XSSFSheet
+                                          XSSFFont
+                                          XSSFColor
+                                          XSSFHyperlink
+                                          TextAlign
+                                          XSSFRow)
            [org.apache.poi.xssf.usermodel XSSFWorkbook]))
+
+;;global workbook
+(def workbook (new XSSFWorkbook))
 
 (defmulti parse-expr (fn [form obj]
                        (cond
@@ -9,7 +26,9 @@
                          (= :tr (first form)) :tr
                          (= :td (first form)) :td
                          (= :tbody (first form)) :tbody
+                         (= :thead (first form)) :thead
                          (= 'for (first form)) :for
+                         (map? form) :map
                          (seq? form) :seq)))
 
 (defn row-empty? [row]
@@ -22,6 +41,10 @@
   [form obj]
   (parse-expr (rest form) obj))
 
+(defmethod parse-expr :thead
+  [form obj]
+  (parse-expr (rest form) obj))
+
 (defmethod parse-expr :for
   [form obj]
   (parse-expr (eval form) obj))
@@ -29,6 +52,22 @@
 (defmethod parse-expr :wb
   [form obj]
   (parse-expr (rest form) obj))
+
+;;CellStyle style = wb.createCellStyle();
+(defmethod parse-expr :map
+  [form obj]
+  (if (and (= "org.apache.poi.xssf.usermodel.XSSFRow"
+              (.getName (type obj)))
+           (contains? form :background-color))
+    (let [style (.createCellStyle workbook)
+          background-color (:background-color form)]
+      (try
+        (.setFillBackgroundColor style (.getIndex (IndexedColors/valueOf (.toUpperCase background-color))))
+        (catch IllegalArgumentException e
+          ;;not an indexed color, let's assume it's hex
+          (.setFillForegroundColor style (new XSSFColor (Color/decode background-color)))))
+      (.setFillPattern style FillPatternType/SOLID_FOREGROUND)
+      (.setRowStyle obj style))))
 
 (defmethod parse-expr :seq
   [form obj]
@@ -70,16 +109,43 @@
       (.setCellValue cell (first (rest form))))))
 
 (defmacro excel [form file]
-  `(let [out# (new FileOutputStream (new File ~file))
-         wb# (new XSSFWorkbook)]
-     (parse-expr '~form wb#)
-     (.write wb# out#)
+  `(let [out# (new FileOutputStream (new File ~file))]
+     (parse-expr '~form workbook)
+     (.write workbook out#)
      (.close out#)))
 
 (defn -main
   "I don't do a whole lot ... yet."
   [& args]
   (excel [:wb
+          [:table {:title "Test"}
+           [:thead
+            [:tr {:background-color "#8DBDD8"}
+             [:td "President"]
+             [:td "Born"]
+             [:td "Died"]
+             [:td "Wiki"]]]
+           [:tbody
+            [:tr [:td "Abraham Lincoln"]
+             [:td "1809"]
+             [:td "1865"]
+             [:td ""]]
+            [:tr
+             [:td "Andrew Johnson"]
+             [:td "1808"]
+             [:td "1875"]
+             [:td ""]]
+            [:tr
+             [:td "Ulysses S. Grant"]
+             [:td "1822"]
+             [:td "1885"]
+             [:td
+              ""]]
+            [:tr
+             [:td "Rutherford B. Hayes"]
+             [:td "1822"]
+             [:td "1893"]
+             [:td ""]]]]
           [:table {:title "First Sheet"}
            [:tr [:td "A"] [:td "B"] [:td "C"] [:td "D"]]
            [:tr [:td "E"] [:td "F"] [:td "G"] [:td "H"]]
