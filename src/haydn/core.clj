@@ -20,16 +20,29 @@
 ;;global workbook
 (def workbook (new XSSFWorkbook))
 
+(defn tr? [element]
+  (cond
+    (not (keyword? element)) false
+    (nil? (re-find #"^tr" (name element))) false
+    :else true))
+
+(defn th? [element]
+  (cond
+    (not (keyword? element)) false
+    (nil? (re-find #"^th" (name element))) false
+    :else true))
+
 (defmulti parse-expr (fn [form obj]
                        (cond
                          (= :wb (first form)) :wb
                          (= :table (first form)) :table
-                         (= :tr (first form)) :tr
+                         (tr? (first form)) :tr
                          (= :td (first form)) :td
                          (= :tbody (first form)) :tbody
                          (= :thead (first form)) :thead
                          (= :a (first form)) :a
                          (= 'for (first form)) :for
+                         (th? (first form)) :th
                          (map? form) :map
                          (seq? form) :seq)))
 
@@ -65,7 +78,6 @@
   [form obj]
   (parse-expr (rest form) obj))
 
-;;CellStyle style = wb.createCellStyle();
 (defmethod parse-expr :map
   [form obj]
   (if (= "org.apache.poi.xssf.usermodel.XSSFRow"
@@ -124,6 +136,25 @@
       :else
       (.setCellValue cell (first (rest form))))))
 
+(defmethod parse-expr :th
+  [form row]
+  (let [cell (.createCell row
+                          (if (= -1 (.getLastCellNum row))
+                            0
+                            (Integer. (str (.getLastCellNum row)))))
+        font (.createFont workbook)
+        style (.getRowStyle row)]
+    (.setBold font true)
+    (.setFont style font)
+    (.setAlignment style HorizontalAlignment/CENTER)
+    (.setCellStyle cell style)
+    (cond
+      (integer? (first (rest form))) (.setCellValue
+                                      cell
+                                      (Double. (str (first (rest form)))))
+      :else
+      (.setCellValue cell (first (rest form))))))
+
 (defmacro excel [form file]
   `(let [out# (new FileOutputStream (new File ~file))]
      (parse-expr '~form workbook)
@@ -137,10 +168,10 @@
           [:table {:title "Test"}
            [:thead
             [:tr {:background-color "#8DBDD8"}
-             [:td "President"]
-             [:td "Born"]
-             [:td "Died"]
-             [:td "Wiki"]]]
+             [:th "President"]
+             [:th "Born"]
+             [:th "Died"]
+             [:th "Wiki"]]]
            [:tbody
             [:tr [:td "Abraham Lincoln"]
              [:td "1809"]
