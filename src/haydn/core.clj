@@ -43,6 +43,7 @@
                          (= :thead (first form)) :thead
                          (= :tfoot (first form)) :tfoot
                          (= :a (first form)) :a
+                         (nil? (first form)) :nil
                          (= 'for (first form)) :for
                          (th? (first form)) :th
                          (map? form) :map
@@ -53,6 +54,9 @@
     (nil? row) true
     (<= (.getLastCellNum row) 0) true
     :else false))
+
+(defmethod parse-expr :nil
+  [form obj])
 
 (defmethod parse-expr :tbody
   [form obj]
