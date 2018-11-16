@@ -13,6 +13,7 @@
                                           XSSFSheet
                                           XSSFFont
                                           XSSFColor
+                                          DefaultIndexedColorMap
                                           XSSFHyperlink
                                           TextAlign
                                           XSSFRow)
@@ -111,7 +112,9 @@
           (.setFillBackgroundColor style (.getIndex (IndexedColors/valueOf (.toUpperCase background-color))))
           (catch IllegalArgumentException e
             ;;not an indexed color, let's assume it's hex
-            (.setFillForegroundColor style (new XSSFColor (Color/decode background-color)))))
+            (.setFillForegroundColor style
+                                     (new XSSFColor (Color/decode background-color)
+                                          (new DefaultIndexedColorMap)))))
         (.setFillPattern style FillPatternType/SOLID_FOREGROUND)
         (.setRowStyle obj style)))))
 
