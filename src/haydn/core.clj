@@ -129,7 +129,12 @@
   (if (not (map? (second form)))
     (throw (Exception. "Title is required")))
   (let [title (:title (second form))
-        sheet (.createSheet obj title)
+        sheet (try
+                (.createSheet obj title)
+                (catch Exception e
+                  (do
+                    (.removeSheetAt obj (.getSheetIndex obj title))
+                    (.createSheet obj title))))
         tr-list (rest (rest form))]
     (dotimes [n (count tr-list)]
       (parse-expr (nth tr-list n) sheet))))
@@ -220,11 +225,9 @@
              [:td "Rutherford B. Hayes"]
              [:td "1822"]
              [:td "1893"]
-             [:td [:a {:href "https://en.wikipedia.org/wiki/Rutherford_B._Hayes"} "Bio"]]]
-            ]
+             [:td [:a {:href "https://en.wikipedia.org/wiki/Rutherford_B._Hayes"} "Bio"]]]]
            [:tfoot
-            [:tr [:td {:colspan "4"} "Reconstruction Presidents."]]]
-           ]
+            [:tr [:td {:colspan "4"} "Reconstruction Presidents."]]]]
           [:table {:title "First Sheet"}
            [:tr [:td "A"] [:td "B"] [:td "C"] [:td "D"]]
            [:tr [:td "E"] [:td "F"] [:td "G"] [:td "H"]]
